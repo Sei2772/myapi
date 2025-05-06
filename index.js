@@ -1018,7 +1018,7 @@ app.get('/selectedDay/:pd/:date', function(req,res){
         ;
         `
     }
-
+//a
 
     if (pd != 0) {
         queryFormat = `
