@@ -486,11 +486,14 @@ app.put("/deleteProduct/:id", async (req, res) => {
 
 // ดึงข้อมูลคำสั่งซื้อทั้งหมด
 app.get('/orders', function (req, res) {
-    connection.query('SELECT * FROM orderdetail', function (error, results, fields) {
+    dbcon.query('SELECT * FROM orderdetail', function (error, results, fields) {
         if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
         return res.send(results);
     });
 });
+
+
+
 
 // ดึงข้อมูลคำสั่งซื้อผ่าน order_id
 app.get('/order/:id', function (req, res) {
@@ -498,43 +501,52 @@ app.get('/order/:id', function (req, res) {
     if (!order_id) {
         return res.status(400).send({ error: true, message: 'Please provide order ID' });
     }
-    connection.query('SELECT * FROM orderdetail WHERE order_id = ?', [order_id], function (error, results, fields) {
+    dbcon.query('SELECT * FROM orderdetail WHERE order_id = ?', [order_id], function (error, results, fields) {
         if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
         return res.send(results);
     });
 });
 
+
 app.get("/products/:id", (req, res) => {
     const productId = req.params.id;
     console.log("API ถูกเรียกด้วย ID:", productId); // เพิ่ม Log ตรวจสอบ
-    connection.query("SELECT * FROM product WHERE idProduct = ?", [productId], (err, results) => {
+    dbcon.query("SELECT * FROM product WHERE idProduct = ?", [productId], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         if (results.length === 0) return res.status(404).json({ message: "ไม่พบสินค้า" });
         res.json(results[0]);
     });
 });
 
-app.post('/add', function (req, res) {  
+
+
+
+
+app.post('/add', function (req, res) {
     let orderData = req.body;
+
 
     // ตรวจสอบว่ามีข้อมูลที่จำเป็น
     if (!orderData.product_name || !orderData.product_weight) {
         return res.status(400).send({ error: true, message: 'Please provide order details' });
     }
 
+
     // ดึง Order ID ล่าสุดจากตาราง orders
-    connection.query('SELECT id FROM orders ORDER BY id DESC LIMIT 1', function (error, results) {
+    dbcon.query('SELECT id FROM orders ORDER BY id DESC LIMIT 1', function (error, results) {
         if (error) {
             console.error('Database error when fetching order id:', error);  // เพิ่มการแสดงข้อผิดพลาด
             return res.status(500).send({ error: true, message: 'Database error', details: error });
         }
 
+
         let latestOrderId = 1;  // กำหนดค่า default หากไม่มีคำสั่งซื้อ (กรณีไม่มีคำสั่งซื้อในระบบ)
+
 
         // ถ้าไม่มีคำสั่งซื้อใดๆ ให้สร้างคำสั่งซื้อใหม่
         if (results.length === 0) {
             // สร้างคำสั่งซื้อใหม่
-            connection.query('INSERT INTO orders (created_at) VALUES (NOW())', function (error, result) {
+            dbcon.query('INSERT INTO orders (created_at) VALUES (NOW())', function (error, result) {
                 if (error) {
                     console.error('Error creating order:', error);  // เพิ่มการแสดงข้อผิดพลาด
                     return res.status(500).send({ error: true, message: 'Database error when creating order', details: error });
@@ -545,77 +557,129 @@ app.post('/add', function (req, res) {
             latestOrderId = results[0].id;  // ใช้ Order ID ล่าสุด ถ้ามีคำสั่งซื้อ
         }
 
+
         // เตรียมข้อมูลสำหรับการเพิ่มหรืออัปเดตสินค้าใน OrderDetail
         let newOrderDetail = {
             order_id: latestOrderId,
             product_name: orderData.product_name,
-            product_weight: orderData.product_weight
+            product_weight: orderData.product_weight,
+            product_price: orderData.product_price * orderData.product_weight
         };
 
+
         // ตรวจสอบว่ามีรายการสินค้านี้ใน orderdetail หรือยัง
-        connection.query('SELECT * FROM orderdetail WHERE order_id = ? AND product_name = ?', [latestOrderId, orderData.product_name], function (error, results) {
+        dbcon.query('SELECT * FROM orderdetail WHERE order_id = ? AND product_name = ?', [latestOrderId, orderData.product_name], function (error, results) {
             if (error) {
                 console.error('Error checking orderdetail:', error);  // เพิ่มการแสดงข้อผิดพลาด
                 return res.status(500).send({ error: true, message: 'Database error when checking order detail', details: error });
             }
 
+
             if (results.length > 0) {
                 // ถ้ามีข้อมูลสินค้าใน orderdetail แล้ว ให้ทำการอัปเดต
-                connection.query('UPDATE orderdetail SET product_weight = ? WHERE order_id = ? AND product_name = ?',
+                dbcon.query('UPDATE orderdetail SET product_weight = ? WHERE order_id = ? AND product_name = ?',
                     [orderData.product_weight, latestOrderId, orderData.product_name], function (error, results) {
-                    if (error) {
-                        console.error('Error updating orderdetail:', error);  // เพิ่มการแสดงข้อผิดพลาด
-                        return res.status(500).send({ error: true, message: 'Database error when updating order detail', details: error });
-                    }
+                        if (error) {
+                            console.error('Error updating orderdetail:', error);  // เพิ่มการแสดงข้อผิดพลาด
+                            return res.status(500).send({ error: true, message: 'Database error when updating order detail', details: error });
+                        }
 
-                    // อัปเดต quantity ใน product
-                    connection.query('UPDATE product SET quantity = quantity - ? WHERE ProductName = ?',
-                        [orderData.product_weight, orderData.product_name], function (error, results) {
-                            if (error) {
-                                console.error('Error updating product quantity:', error);  // เพิ่มการแสดงข้อผิดพลาด
-                                return res.status(500).send({ error: true, message: 'Database error when updating product quantity', details: error });
-                            }
-                            return res.send({ success: true, message: 'Order updated and product quantity updated successfully.' });
+
+                        // อัปเดต quantity ใน product
+                        dbcon.query('UPDATE product SET quantity = quantity - ? WHERE ProductName = ?',
+                            [orderData.product_weight, orderData.product_name], function (error, results) {
+                                if (error) {
+                                    console.error('Error updating product quantity:', error);  // เพิ่มการแสดงข้อผิดพลาด
+                                    return res.status(500).send({ error: true, message: 'Database error when updating product quantity', details: error });
+                                }
+                                return res.send({ success: true, message: 'Order updated and product quantity updated successfully.' });
+                            });
                     });
-                });
             } else {
                 // ถ้าไม่มีข้อมูลสินค้า ให้เพิ่มข้อมูลใหม่
-                connection.query('INSERT INTO orderdetail SET ?', newOrderDetail, function (error, results) {
+                dbcon.query('INSERT INTO orderdetail SET ?', newOrderDetail, function (error, results) {
                     if (error) {
                         console.error('Error inserting into orderdetail:', error);  // เพิ่มการแสดงข้อผิดพลาด
                         return res.status(500).send({ error: true, message: 'Database error when adding order detail', details: error });
                     }
 
+
                     // อัปเดต quantity ใน product
-                    connection.query('UPDATE product SET quantity = quantity - ? WHERE ProductName = ?',
+                    dbcon.query('UPDATE product SET quantity = quantity - ? WHERE ProductName = ?',
                         [orderData.product_weight, orderData.product_name], function (error, results) {
                             if (error) {
                                 console.error('Error updating product quantity:', error);  // เพิ่มการแสดงข้อผิดพลาด
                                 return res.status(500).send({ error: true, message: 'Database error when updating product quantity', details: error });
                             }
                             return res.send({ success: true, message: 'Order added and product quantity updated successfully.' });
-                    });
+                        });
                 });
             }
         });
     });
 });
 
+
+
+
+
+
 app.delete('/order/:id', function (req, res) {
     let order_id = req.params.id;
     if (!order_id) {
         return res.status(400).send({ error: true, message: 'Please provide order ID' });
     }
-    connection.query('DELETE FROM orderdetail WHERE order_id = ?', [order_id], function (error, results, fields) {
+    dbcon.query('DELETE FROM orderdetail WHERE order_id = ?', [order_id], function (error, results, fields) {
         if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
+
+
+
+
+
+
+
 
         if (results.affectedRows === 0) {
             return res.status(404).send({ error: true, message: 'Order not found' });
         }
 
+
+
+
+
+
+
+
         return res.send({ success: true, message: 'Order deleted successfully.' });
     });
 });
+
+
+
+
+app.delete('/order/:id', function (req, res) {
+    let order_id = req.params.id;
+    if (!order_id) {
+        return res.status(400).send({ error: true, message: 'Please provide order ID' });
+    }
+    dbcon.query('DELETE FROM orderdetail WHERE order_id = ?', [order_id], function (error, results, fields) {
+        if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
+
+
+
+
+        if (results.affectedRows === 0) {
+            return res.status(404).send({ error: true, message: 'Order not found' });
+        }
+
+
+
+
+        return res.send({ success: true, message: 'Order deleted successfully.' });
+    });
+});
+
+
 
 app.get("/topproducts", (req, res) => {
     const sql = `
@@ -624,18 +688,22 @@ app.get("/topproducts", (req, res) => {
     ORDER BY quantity DESC
     LIMIT 4
     `;
-    connection.query(sql, function (error, results) {
+    dbcon.query(sql, function (error, results) {
         if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
         return res.send(results);  // ส่งผลลัพธ์กลับไปยัง client
     });
 });
+
+
+
+
 
 // API เพิ่มรายละเอียดคำสั่งซื้อ (/api/orderdetail)
 app.post("/api/orderdetail", async (req, res) => {
     try {
         const { order_id, product_name, product_weight, idProduct } = req.body; // รับ idProduct จาก request body
 
-        await connection.query(
+        await dbcon.query(
             "INSERT INTO orderdetail (order_id, product_name, product_weight, idProduct) VALUES (?, ?, ?, ?)",
             [order_id, product_name, product_weight, idProduct]
         );
@@ -656,7 +724,7 @@ app.post('/orderdetail/add', async (req, res) => {
 
     try {
         const sql = "INSERT INTO orderdetail (order_id, product_name, product_weight, idProduct) VALUES (?, ?, ?, ?)";
-        await connection.query(sql, [order_id, product_name, product_weight, idProduct]);
+        await dbcon.query(sql, [order_id, product_name, product_weight, idProduct]);
 
         res.status(201).json({ message: "เพิ่ม orderdetail สำเร็จ!" });
     } catch (error) {
@@ -664,17 +732,17 @@ app.post('/orderdetail/add', async (req, res) => {
     }
 });
 
-// API สร้างคำสั่งซื้อใหม่ (/neworder)
+// API สร้างคำสั่งซื้อใหม่ (/neworder)    
 app.post('/neworder', function (req, res) {
-    let user_id = req.body.user_id; // รับ user_id จาก request body
+    let user_id = req.body.user_id || 0; // ถ้าไม่มี ให้ใช้ null แทน
+    let newOrder = { created_at: new Date() };
 
-    if (!user_id) {
-        return res.status(400).send({ error: true, message: 'Please provide user_id' });
+    // เพิ่ม user_id ถ้ามีค่า
+    if (user_id !== null) {
+        newOrder.user_id = user_id;
     }
 
-    let newOrder = { created_at: new Date(), user_id: user_id };
-
-    connection.query('INSERT INTO orders SET ?', newOrder, function (error, results) {
+    dbcon.query('INSERT INTO orders SET ?', newOrder, function (error, results) {
         if (error) {
             return res.status(500).send({ error: true, message: 'Database error', details: error });
         }
@@ -682,6 +750,12 @@ app.post('/neworder', function (req, res) {
         return res.send({ success: true, message: 'New order created successfully.', order_id: results.insertId });
     });
 });
+
+
+
+
+
+
 
 // API ดึงข้อมูลสินค้า (/products, /products/filter, /search/products)
 app.get('/products', function (req, res) {
@@ -694,11 +768,15 @@ app.get('/products', function (req, res) {
         params.push(ProductType_idProductType);
     }
 
-    connection.query(query, params, function (error, results) {
+    dbcon.query(query, params, function (error, results) {
         if (error) return res.status(500).json({ error: true, message: 'Database error', details: error });
         return res.json(results);
     });
 });
+
+
+
+
 
 app.get('/products/filter', function (req, res) {
     let { ProductType_idProductType } = req.query;
@@ -707,7 +785,7 @@ app.get('/products/filter', function (req, res) {
         return res.status(400).json({ error: true, message: 'กรุณาระบุ ProductType_idProductType' });
     }
 
-    connection.query('SELECT * FROM product WHERE ProductType_idProductType = ? AND isDeleted = FALSE',
+    dbcon.query('SELECT * FROM product WHERE ProductType_idProductType = ? AND isDeleted = FALSE',
         [ProductType_idProductType],
         function (error, results) {
             if (error) return res.status(500).json({ error: true, message: 'Database error', details: error });
@@ -715,6 +793,7 @@ app.get('/products/filter', function (req, res) {
         }
     );
 });
+
 
 app.get('/search/products', function (req, res) {
     let { name, min_price, max_price, category, ProductType_idProductType } = req.query; // เพิ่ม ProductType_idProductType
@@ -742,11 +821,17 @@ app.get('/search/products', function (req, res) {
         params.push(ProductType_idProductType);
     }
 
-    connection.query(query, params, function (error, results) {
+    dbcon.query(query, params, function (error, results) {
         if (error) return res.status(500).json({ error: true, message: 'Database error', details: error });
         return res.json(results);
     });
 });
+
+
+
+
+
+
 
 app.get('/products/filter', function (req, res) {
     let { ProductType_idProductType } = req.query;
@@ -755,7 +840,7 @@ app.get('/products/filter', function (req, res) {
         return res.status(400).json({ error: true, message: 'กรุณาระบุ ProductType_idProductType' });
     }
 
-    connection.query('SELECT * FROM product WHERE idProduct  = ? AND isDeleted = FALSE',
+    dbcon.query('SELECT * FROM product WHERE idProduct  = ? AND isDeleted = FALSE',
         [ProductType_idProductType],
         function (error, results) {
             if (error) return res.status(500).json({ error: true, message: 'Database error', details: error });
@@ -763,6 +848,13 @@ app.get('/products/filter', function (req, res) {
         }
     );
 });
+
+
+
+
+
+
+
 
 app.get("/api/orders/details", (req, res) => {
     const sql = `
@@ -781,6 +873,9 @@ app.get("/api/orders/details", (req, res) => {
         }
     });
 });
+
+
+
 app.get('/orderdetails', function (req, res) {
     const sql = `
         SELECT orderdetail.order_id,
@@ -803,6 +898,143 @@ app.get('/orderdetails', function (req, res) {
     });
 });
 
+// app.get('/orderdetails', function (req, res) {
+//     const sql = `
+//         SELECT orderdetail.order_id,
+//                orderdetail.product_name,
+//                orderdetail.product_weight,
+//                orderdetail.product_price,
+//                orders.created_at
+//         FROM orderdetail
+//         JOIN orders ON orderdetail.order_id = orders.id
+//         GROUP BY orderdetail.order_id, orderdetail.product_name, orderdetail.product_weight, orders.created_at
+//         ORDER BY orders.created_at DESC;
+//     `;
+
+
+//     dbcon.query(sql, function (error, results) {
+//         if (error) {
+//             return res.status(500).send({ error: true, message: 'Database error', details: error });
+//         }
+//         return res.send(results);
+//     });
+// });
+
+
+
+
+
+//---------------------------------------------------------------------
+
+app.get('/orderDetailJoin/:code', function(req,res){
+    let code = req.params.code;
+
+
+    let queryFormat = `
+        SELECT
+            orderdetail.id AS od_ID,
+            product.idProduct AS pd_ID,
+            product.ProductName AS pd_Name,
+            producttype.ProductType_Name AS pd_TypeName,
+            product.img AS pd_Image,
+            orderdetail.product_weight AS pd_Weight,
+            product.Price_gram AS pd_PriceXGram,
+            orderdetail.product_price AS pd_Price,
+            product.quantity AS pd_Quantity,
+            orders.created_at AS od_Time
+        FROM orderdetail
+            LEFT JOIN orders ON orderdetail.order_id = orders.id
+            LEFT JOIN product ON orderdetail.idProduct = product.idProduct
+            LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
+        WHERE product.isDeleted = 0 AND orderdetail.product_weight IS NOT NULL AND orderdetail.product_price IS NOT NULL  `
+
+
+    if (code == 0) {
+        queryFormat += `AND DATE(orders.created_at) = CURDATE()`
+    }
+    else if (code == 1) {
+        queryFormat += `AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`
+    }
+    else if (code == 2) {
+        queryFormat += `AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)`
+    }
+
+
+    queryFormat += ` ORDER BY orders.created_at DESC;`
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+
+
+app.get('/getDayProductJoinType/:pd/:date', function(req,res){
+    let pd = req.params.pd;
+    let date = req.params.date;
+
+
+    let queryFormat = `
+        SELECT
+            orderdetail.id AS od_ID,
+            product.idProduct AS pd_ID,
+            product.ProductName AS pd_Name,
+            producttype.ProductType_Name AS pd_TypeName,
+            product.img AS pd_Image,
+            orderdetail.product_weight AS pd_Weight,
+            product.Price_gram AS pd_PriceXGram,
+            orderdetail.product_price AS pd_Price,
+            product.quantity AS pd_Quantity,
+            orders.created_at AS od_Time
+        FROM orderdetail
+            LEFT JOIN orders ON orderdetail.order_id = orders.id
+            LEFT JOIN product ON orderdetail.idProduct = product.idProduct
+            LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
+        WHERE product.isDeleted = 0 AND orderdetail.product_weight IS NOT NULL AND orderdetail.product_price IS NOT NULL  
+    `
+    if (date) {
+        queryFormat += ` AND DATE(orders.created_at) = CAST('${date}' AS DATE)`;
+    }
+
+
+    if (pd != 0) {
+        queryFormat += ` AND product.idProduct = ${pd}`;
+    }
+
+
+    queryFormat += ` ORDER BY orders.created_at DESC;`
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+
+
+app.get('/getProductJoinType', function(req,res){
+
+
+    let queryFormat = `
+    SELECT
+        product.idProduct AS pd_ID,
+        product.ProductName AS pd_Name,
+        producttype.ProductType_Name AS pd_TypeName
+    FROM product
+        LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
+    WHERE isDeleted = 0
+    `
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+
+
+
 // API สำหรับ Dashboard
 app.get('/dashboard', function (req, res) {
     let query = `
@@ -843,3 +1075,172 @@ app.listen(process.env.PORT || 3000, function () {
     console.log('Node app is running on port 3000');
 });
 module.exports = app;
+
+app.put("/softDeleteOrderdetail/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("กำลังลบสินค้า ID:", id); // Debug log
+
+        if (!id || isNaN(id)) {
+            return res.status(400).json({ error: "รหัสสินค้าที่ส่งมาไม่ถูกต้อง" });
+        }
+
+        // ตรวจสอบว่าสินค้ามีอยู่จริง
+        dbcon.query("SELECT * FROM orderdetail WHERE order_id = ?", [id], (error, results) => {
+            if (error) {
+                return res.status(500).json({ error: "Database error", details: error });
+            }
+            if (results.length === 0) {
+                return res.status(404).json({ error: "ไม่พบสินค้า" });
+            }
+
+            // ทำ Soft Delete
+            dbcon.query("UPDATE orderdetail SET isDelete = 1 WHERE order_id = ?", [id], (error, result) => {
+                if (error) {
+                    return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะลบสินค้า" });
+                }
+                return res.status(200).json({ message: "ลบสินค้าสำเร็จ" });
+            });
+        });
+
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาด:", error);
+        res.status(500).json({ error: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
+    }
+});
+
+//------------------------------------------------------
+
+//New!!!
+app.get('/moreDate/:day', function(req,res){
+
+
+    let day = req.params.day;
+
+
+    let queryFormat = ``
+
+
+    if (day == 7 || day == 30) {
+        queryFormat = `
+        WITH RECURSIVE numbers AS (
+            SELECT 0 AS n
+            UNION ALL
+            SELECT n + 1 FROM numbers WHERE n < ${day}
+        )
+        SELECT
+            DATE(DATE_SUB(CURDATE(), INTERVAL numbers.n DAY)) AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM numbers
+            LEFT JOIN orders o ON DATE(o.created_at) = DATE_SUB(CURDATE(), INTERVAL numbers.n DAY)
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isdelete = 0
+        GROUP BY time_group
+        ORDER BY time_group DESC
+        LIMIT 32;
+        `
+    }
+
+
+    if (day == 1) {
+        queryFormat = `
+        WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM hours
+        LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CURDATE()
+        LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group;
+        `
+    }
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+
+
+app.get('/selectedDay/:pd/:date', function(req,res){
+    let pd = req.params.pd;
+    let date = req.params.date;
+
+
+    let queryFormat = `
+            WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM hours
+            LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CURDATE()
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+            LEFT JOIN product ON product.idProduct = orderdetail.idProduct
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group
+        ;
+    `
+
+
+    if (date){
+        queryFormat = `
+        WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM hours
+            LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CAST('${date}' AS DATE)
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+            LEFT JOIN product ON product.idProduct = orderdetail.idProduct
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group
+        ;
+        `
+    }
+
+
+    if (pd != 0) {
+        queryFormat = `
+        WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(SUM(CASE WHEN product.idProduct = 12 THEN 1 ELSE 0 END), 0) AS total,
+            COALESCE(SUM(CASE WHEN product.idProduct = 12 THEN COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0) ELSE 0 END), 0) AS total_weight_price
+        FROM hours
+            LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CAST('${date}' AS DATE)
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+            LEFT JOIN product ON product.idProduct = orderdetail.idProduct AND product.idProduct = ${pd}
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group;
+       
+        `;
+    }
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+
