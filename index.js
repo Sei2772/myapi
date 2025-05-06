@@ -530,7 +530,7 @@ app.get("/api/orders/details", (req, res) => {
         ORDER BY orders.created_at ASC;
     `;
 
-    connection.query(sql, (err, results) => {
+    dbcon.query(sql, (err, results) => {
         if (err) {
             res.status(500).json({ error: err.message });
         } else {
@@ -538,18 +538,21 @@ app.get("/api/orders/details", (req, res) => {
         }
     });
 });
-
 app.get('/orderdetails', function (req, res) {
     const sql = `
         SELECT orderdetail.order_id,
-            orderdetail.goods_name,
-            orderdetail.goods_weight,
-            orders.created_at
+               orderdetail.product_name,
+               orderdetail.product_weight,
+               orderdetail.product_price,
+               orders.created_at
         FROM orderdetail
-        JOIN orders ON orderdetail.order_id = orders.id;
+        JOIN orders ON orderdetail.order_id = orders.id
+        WHERE isDelete = 0
+        GROUP BY orderdetail.order_id, orderdetail.product_name, orderdetail.product_weight,orderdetail.product_price, orders.created_at
+        ORDER BY orders.created_at DESC;
     `;
 
-    connection.query(sql, function (error, results) {
+    dbcon.query(sql, function (error, results) {
         if (error) {
             return res.status(500).send({ error: true, message: 'Database error', details: error });
         }
