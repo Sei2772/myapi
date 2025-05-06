@@ -1,4 +1,7 @@
 
+
+
+
 var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
@@ -28,7 +31,7 @@ app.get('/', function (req, res) {
 
 
 
-dbcon.connect();
+// dbcon.connect();
 
 
 
@@ -92,7 +95,7 @@ app.put('/update/:id', function (req, res) {
         return res.send({ error: false, data: results, message: 'User updated successfully.' });
     });
 });
-//a
+
 
 
 
@@ -450,13 +453,6 @@ app.delete('/order/:id', function (req, res) {
     }
     dbcon.query('DELETE FROM orderdetail WHERE order_id = ?', [order_id], function (error, results, fields) {
         if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
-
-
-
-
-
-
-
 
         if (results.affectedRows === 0) {
             return res.status(404).send({ error: true, message: 'Order not found' });
@@ -1044,6 +1040,19 @@ app.get('/selectedDay/:pd/:date', function(req,res){
                 return res.send(results);
     });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
