@@ -559,6 +559,77 @@ app.get('/orderdetails', function (req, res) {
         return res.send(results);
     });
 });
+
+// app.get('/orderdetails', function (req, res) {
+//     const sql = `
+//         SELECT orderdetail.order_id,
+//                orderdetail.product_name,
+//                orderdetail.product_weight,
+//                orderdetail.product_price,
+//                orders.created_at
+//         FROM orderdetail
+//         JOIN orders ON orderdetail.order_id = orders.id
+//         GROUP BY orderdetail.order_id, orderdetail.product_name, orderdetail.product_weight, orders.created_at
+//         ORDER BY orders.created_at DESC;
+//     `;
+
+
+//     dbcon.query(sql, function (error, results) {
+//         if (error) {
+//             return res.status(500).send({ error: true, message: 'Database error', details: error });
+//         }
+//         return res.send(results);
+//     });
+// });
+
+
+
+
+
+//---------------------------------------------------------------------
+
+app.get('/orderDetailJoin/:code', function(req,res){
+    let code = req.params.code;
+
+
+    let queryFormat = `
+        SELECT
+            orderdetail.id AS od_ID,
+            product.idProduct AS pd_ID,
+            product.ProductName AS pd_Name,
+            producttype.ProductType_Name AS pd_TypeName,
+            product.img AS pd_Image,
+            orderdetail.product_weight AS pd_Weight,
+            product.Price_gram AS pd_PriceXGram,
+            orderdetail.product_price AS pd_Price,
+            product.quantity AS pd_Quantity,
+            orders.created_at AS od_Time
+        FROM orderdetail
+            LEFT JOIN orders ON orderdetail.order_id = orders.id
+            LEFT JOIN product ON orderdetail.idProduct = product.idProduct
+            LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
+        WHERE product.isDeleted = 0 AND orderdetail.product_weight IS NOT NULL AND orderdetail.product_price IS NOT NULL  `
+
+
+    if (code == 0) {
+        queryFormat += `AND DATE(orders.created_at) = CURDATE()`
+    }
+    else if (code == 1) {
+        queryFormat += `AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`
+    }
+    else if (code == 2) {
+        queryFormat += `AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)`
+    }
+
+
+    queryFormat += ` ORDER BY orders.created_at DESC;`
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
 app.put("/softDeleteOrderdetail/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -719,6 +790,67 @@ app.get('/selectedDay/:pd/:date', function(req,res){
        
         `;
     }
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+app.get('/getDayProductJoinType/:pd/:date', function(req,res){
+    let pd = req.params.pd;
+    let date = req.params.date;
+
+
+    let queryFormat = `
+        SELECT
+            orderdetail.id AS od_ID,
+            product.idProduct AS pd_ID,
+            product.ProductName AS pd_Name,
+            producttype.ProductType_Name AS pd_TypeName,
+            product.img AS pd_Image,
+            orderdetail.product_weight AS pd_Weight,
+            product.Price_gram AS pd_PriceXGram,
+            orderdetail.product_price AS pd_Price,
+            product.quantity AS pd_Quantity,
+            orders.created_at AS od_Time
+        FROM orderdetail
+            LEFT JOIN orders ON orderdetail.order_id = orders.id
+            LEFT JOIN product ON orderdetail.idProduct = product.idProduct
+            LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
+        WHERE product.isDeleted = 0 AND orderdetail.product_weight IS NOT NULL AND orderdetail.product_price IS NOT NULL  
+    `
+    if (date) {
+        queryFormat += ` AND DATE(orders.created_at) = CAST('${date}' AS DATE)`;
+    }
+
+
+    if (pd != 0) {
+        queryFormat += ` AND product.idProduct = ${pd}`;
+    }
+
+
+    queryFormat += ` ORDER BY orders.created_at DESC;`
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+
+app.get('/getProductJoinType', function(req,res){
+
+
+    let queryFormat = `
+    SELECT
+        product.idProduct AS pd_ID,
+        product.ProductName AS pd_Name,
+        producttype.ProductType_Name AS pd_TypeName
+    FROM product
+        LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
+    WHERE isDeleted = 0
+    `
 
 
     dbcon.query(queryFormat, function(error,results, fields){
