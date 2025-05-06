@@ -538,6 +538,9 @@ app.get("/api/orders/details", (req, res) => {
         }
     });
 });
+
+
+
 app.get('/orderdetails', function (req, res) {
     const sql = `
         SELECT orderdetail.order_id,
