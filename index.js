@@ -23,15 +23,15 @@ app.get('/', function (req, res) {
 
 
 
-// const dbcon = mysql.createConnection({ 
-//     host: process.env.DB_HOST || 'localhost', 
-//     user: process.env.DB_USER || 'root', 
-//     password: process.env.DB_PASSWORD || '', 
-//     database: process.env.DB_NAME || 'mydb' });
+const dbcon = mysql.createConnection({ 
+    host: process.env.DB_HOST || 'localhost', 
+    user: process.env.DB_USER || 'root', 
+    password: process.env.DB_PASSWORD || '', 
+    database: process.env.DB_NAME || 'mydb' });
 
 
 
-// dbcon.connect();
+dbcon.connect();
 
 
 
