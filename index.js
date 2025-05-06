@@ -241,6 +241,249 @@ app.put("/deleteProduct/:id", async (req, res) => {
     }
 });
 
+const express = require('express');
+const cors = require('cors');
+const mysql = require('mysql2')
+const bcrypt = require('bcryptjs'); // ✅ เปิดใช้งาน bcrypt
+require('dotenv').config();
+
+var app = express();
+// ✅ เปิดใช้งานการอ่าน JSON และ x-www-form-urlencoded body
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const connection = mysql.createConnection(process.env.DATABASE_URL)
+
+// var bodyParser = require('body-parser');
+// const bcrypt = require('bcryptjs');
+
+// app.use(bodyParser.json());
+// app.use(bodyParser.urlencoded({ extended: true }));
+
+
+app.get('/', function (req, res) {
+    res.json({msg: 'it working!'})
+});
+
+// var db = mysql.createConnection({
+//     host: process.env.DB_HOST,
+//     user: process.env.DB_USER,
+//     password: process.env.DB_PASSWORD,
+//     database: process.env.DB_NAME,
+// });
+
+// dbcon.connect();
+
+// ดึงข้อมูลทั้งหมดจาก users
+app.get('/allUsers', function (req, res) {
+    connection.query('SELECT * FROM users', function (error, results, fields) {
+        if (error) throw error;
+        return res.send(results);
+    });
+});
+
+// เพิ่มข้อมูลผู้ใช้
+app.post('/user', function (req, res) {
+    var user = req.body;
+    if (!user) {
+        return res.status(400).send({ error: true, message: 'Please provide user data' });
+    }
+    connection.query("INSERT INTO users SET ?", user, function (error, results, fields) {
+        if (error) throw error;
+        return res.send(results);
+    });
+});
+
+// อัปเดตข้อมูลผู้ใช้
+app.put('/update/:id', function (req, res) {
+    var user_id = req.params.id;
+    var user_data = req.body;
+
+    if (!user_id || !user_data || Object.keys(user_data).length === 0) {
+        return res.status(400).send({ error: true, message: 'Please provide user data' });
+    }
+
+    connection.query("UPDATE users SET ? WHERE user_id = ?", [user_data, user_id], function (error, results, fields) {
+        if (error) {
+            return res.status(500).send({ error: true, message: 'Database error', details: error });
+        }
+
+        if (results.affectedRows === 0) {
+            return res.status(404).send({ error: true, message: 'User not found' });
+        }
+
+        return res.send({ error: false, data: results, message: 'User updated successfully.' });
+    });
+});
+
+// ลบข้อมูลผู้ใช้
+app.delete('/delete/:id', function (req, res) {
+    var user_id = req.params.id;
+    if (!user_id) {
+        return res.status(400).send({ error: true, message: 'Please provide user ID' });
+    }
+    connection.query('DELETE FROM users WHERE user_id = ?', user_id, function (error, results, fields) {
+        if (error) throw error;
+        return res.send({ error: false, data: results, message: 'User deleted successfully.' });
+    });
+});
+
+app.post('/register', async function (req, res) {
+    let post = req.body;
+    let user_id = post.user_id;
+    let user_name = post.user_name;
+    let password = post.password;
+    let role = 'employee';  // 🛑 *ตั้งค่า Role ตายตัว ห้ามเปลี่ยน*
+
+    const salt = await bcrypt.genSalt(10);
+    let password_hash = await bcrypt.hash(password, salt);
+
+    connection.query('SELECT * FROM users WHERE user_id = ?', [user_id], function (error, results, fields) {
+        if (error) throw error;
+        if (results[0]) {
+            return res.status(400).send({ error: true, message: 'This user ID is already in the database.' });
+        } else {
+            let insertData = "INSERT INTO users (user_id, user_name, password, role) VALUES (?, ?, ?, ?)";
+            connection.query(insertData, [user_id, user_name, password_hash, role], function (error, results) {
+                if (error) throw error;
+                return res.send({ success: true, message: 'User registered successfully.' });
+            });
+        }
+    });
+});
+
+// เพิ่มสินค้าใหม่ (POST /products)
+app.post('/products', function (req, res) {
+let productData = req.body;
+
+if (!productData.ProductName || !productData.Price_gram || !productData.quantity || !productData.ProductType_idProductType || !productData.img) {
+    return res.status(400).send({ error: true, message: 'Please provide all product details.' });
+}
+
+let newProduct = {
+    ProductName: productData.ProductName,
+    Price_gram: productData.Price_gram,
+    quantity: productData.quantity,
+    ProductType_idProductType: productData.ProductType_idProductType,
+    img: productData.img
+};
+
+connection.query('INSERT INTO product SET ?', newProduct, function (error, results) {
+    if (error) {
+        return res.status(500).send({ error: true, message: 'Database error', details: error });
+    }
+    return res.send({ success: true, message: 'Product added successfully.', productId: results.insertId });
+});
+});
+
+// เข้าสู่ระบบ
+app.post('/login', function (req, res) {
+    let user = req.body;
+    let user_id = user.user_id;
+    let password = user.password;
+
+    if (!user_id || !password) {
+        return res.status(400).send({ error: true, message: 'Please provide user ID and password.' });
+    }
+
+    connection.query('SELECT * FROM users WHERE user_id = ?', [user_id], function (error, results, fields) {
+        if (error) throw error;
+        if (results[0]) {
+            bcrypt.compare(password, results[0].password, function (error, result) {
+                if (error) throw error;
+                if (result) {
+                    return res.send({ success: true, user_id: results[0].user_id, role: results[0].role });
+                } else {
+                    return res.send({ success: false, message: 'Incorrect password' });
+                }
+            });
+        } else {
+            return res.send({ success: false, message: 'User not found' });
+        }
+    });
+});
+
+// ค้นหาข้อมูลผู้ใช้ตาม user_id
+app.get('/search/:id', function (req, res) {
+    let user_id = req.params.id;
+    if (!user_id) {
+        return res.status(400).send({ error: true, message: 'Please provide user ID' });
+    }
+    connection.query('SELECT * FROM users WHERE user_id = ?', user_id, function (error, result, fields) {
+        if (error) throw error;
+        if (result[0]) {
+            return res.send({
+                user_id: result[0].user_id,
+                user_name: result[0].user_name,
+                role: result[0].role
+            });
+        } else {
+            return res.status(404).send({ error: true, message: 'User not found' });
+        }
+    });
+});
+
+app.patch('/products/:id', (req, res) => {
+    const product_id = req.params.id;
+    const updateData = req.body;
+
+    // ตรวจสอบว่า ID และข้อมูลที่ต้องการอัปเดตถูกต้องหรือไม่
+    if (!product_id || Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: true, message: 'กรุณาระบุข้อมูลสินค้าให้ครบถ้วน' });
+    }
+
+    // ตรวจสอบว่า idProduct มีอยู่จริงหรือไม่
+    connection.query('SELECT * FROM product WHERE idProduct = ?', [product_id], (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: true, message: 'Database error', details: err });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ error: true, message: 'ไม่พบสินค้าที่ต้องการอัปเดต' });
+        }
+
+        // อัปเดตข้อมูลสินค้า
+        connection.query('UPDATE product SET ? WHERE idProduct = ?', [updateData, product_id], (error, results) => {
+            if (error) {
+                return res.status(500).json({ error: true, message: 'Database error', details: error });
+            }
+            return res.json({ success: true, message: 'อัปเดตสินค้าสำเร็จ' });
+        });
+    });
+});
+
+app.put("/deleteProduct/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("กำลังลบสินค้า ID:", id); // Debug log
+
+        if (!id || isNaN(id)) {
+            return res.status(400).json({ error: "รหัสสินค้าที่ส่งมาไม่ถูกต้อง" });
+        }
+
+        // ตรวจสอบว่าสินค้ามีอยู่จริง
+        connection.query("SELECT * FROM product WHERE idProduct = ?", [id], (error, results) => {
+            if (error) {
+                return res.status(500).json({ error: "Database error", details: error });
+            }
+            if (results.length === 0) {
+                return res.status(404).json({ error: "ไม่พบสินค้า" });
+            }
+
+            // ทำ Soft Delete
+            connection.query("UPDATE product SET isDeleted = TRUE WHERE idProduct = ?", [id], (error, result) => {
+                if (error) {
+                    return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะลบสินค้า" });
+                }
+                return res.status(200).json({ message: "ลบสินค้าสำเร็จ" });
+            });
+        });
+
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาด:", error);
+        res.status(500).json({ error: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
+    }
+});
+
 // ดึงข้อมูลคำสั่งซื้อทั้งหมด
 app.get('/orders', function (req, res) {
     connection.query('SELECT * FROM orderdetail', function (error, results, fields) {
@@ -559,6 +802,27 @@ app.get('/orderdetails', function (req, res) {
         return res.send(results);
     });
 });
+
+// API สำหรับ Dashboard
+app.get('/dashboard', function (req, res) {
+    let query = `
+        SELECT
+            (SELECT COUNT(*) FROM orderdetail) AS total_orders,
+            (SELECT COUNT(*) FROM products) AS total_products,
+            (SELECT SUM(goods_weight) FROM orderdetail) AS total_sales
+    `;
+    connection.query(query, function (error, results) {
+        if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
+        return res.send(results[0]);
+    });
+});
+
+// เริ่มต้นเซิร์ฟเวอร์    
+app.listen(process.env.PORT || 3000, function () {
+    console.log('Node app is running on port 3000');
+});
+module.exports = app;
+
 
 // API สำหรับ Dashboard
 app.get('/dashboard', function (req, res) {
