@@ -559,6 +559,173 @@ app.get('/orderdetails', function (req, res) {
         return res.send(results);
     });
 });
+app.put("/softDeleteOrderdetail/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("กำลังลบสินค้า ID:", id); // Debug log
+
+        if (!id || isNaN(id)) {
+            return res.status(400).json({ error: "รหัสสินค้าที่ส่งมาไม่ถูกต้อง" });
+        }
+
+        // ตรวจสอบว่าสินค้ามีอยู่จริง
+        dbcon.query("SELECT * FROM orderdetail WHERE order_id = ?", [id], (error, results) => {
+            if (error) {
+                return res.status(500).json({ error: "Database error", details: error });
+            }
+            if (results.length === 0) {
+                return res.status(404).json({ error: "ไม่พบสินค้า" });
+            }
+
+            // ทำ Soft Delete
+            dbcon.query("UPDATE orderdetail SET isDelete = 1 WHERE order_id = ?", [id], (error, result) => {
+                if (error) {
+                    return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะลบสินค้า" });
+                }
+                return res.status(200).json({ message: "ลบสินค้าสำเร็จ" });
+            });
+        });
+
+    } catch (error) {
+        console.error("เกิดข้อผิดพลาด:", error);
+        res.status(500).json({ error: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
+    }
+});
+
+//------------------------------------------------------
+
+//New!!!
+app.get('/moreDate/:day', function(req,res){
+
+
+    let day = req.params.day;
+
+
+    let queryFormat = ``
+
+
+    if (day == 7 || day == 30) {
+        queryFormat = `
+        WITH RECURSIVE numbers AS (
+            SELECT 0 AS n
+            UNION ALL
+            SELECT n + 1 FROM numbers WHERE n < ${day}
+        )
+        SELECT
+            DATE(DATE_SUB(CURDATE(), INTERVAL numbers.n DAY)) AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM numbers
+            LEFT JOIN orders o ON DATE(o.created_at) = DATE_SUB(CURDATE(), INTERVAL numbers.n DAY)
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isdelete = 0
+        GROUP BY time_group
+        ORDER BY time_group DESC
+        LIMIT 32;
+        `
+    }
+
+
+    if (day == 1) {
+        queryFormat = `
+        WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM hours
+        LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CURDATE()
+        LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group;
+        `
+    }
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
+
+
+app.get('/selectedDay/:pd/:date', function(req,res){
+    let pd = req.params.pd;
+    let date = req.params.date;
+
+
+    let queryFormat = `
+            WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM hours
+            LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CURDATE()
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+            LEFT JOIN product ON product.idProduct = orderdetail.idProduct
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group
+        ;
+    `
+
+
+    if (date){
+        queryFormat = `
+        WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(COUNT(o.created_at), 0) AS total,
+            SUM(COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0)) AS total_weight_price
+        FROM hours
+            LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CAST('${date}' AS DATE)
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+            LEFT JOIN product ON product.idProduct = orderdetail.idProduct
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group
+        ;
+        `
+    }
+
+
+    if (pd != 0) {
+        queryFormat = `
+        WITH RECURSIVE hours AS (
+            SELECT 1 AS hour_group
+            UNION ALL
+            SELECT hour_group + 1 FROM hours WHERE hour_group < 24
+        )
+        SELECT
+            hours.hour_group AS time_group,
+            COALESCE(SUM(CASE WHEN product.idProduct = 12 THEN 1 ELSE 0 END), 0) AS total,
+            COALESCE(SUM(CASE WHEN product.idProduct = 12 THEN COALESCE(CAST(orderdetail.product_weight AS FLOAT), 0) * COALESCE(CAST(orderdetail.product_price AS FLOAT), 0) ELSE 0 END), 0) AS total_weight_price
+        FROM hours
+            LEFT JOIN orders o ON FLOOR(TIME_FORMAT(o.created_at, '%H')) + 1 = hours.hour_group AND DATE(o.created_at) = CAST('${date}' AS DATE)
+            LEFT JOIN orderdetail ON o.id = orderdetail.order_id AND orderdetail.isDelete = 0
+            LEFT JOIN product ON product.idProduct = orderdetail.idProduct AND product.idProduct = ${pd}
+        GROUP BY hours.hour_group
+        ORDER BY hours.hour_group;
+       
+        `;
+    }
+
+
+    dbcon.query(queryFormat, function(error,results, fields){
+            if(error) throw error;
+                return res.send(results);
+    });
+});
 
 // API สำหรับ Dashboard
 app.get('/dashboard', function (req, res) {
