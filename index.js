@@ -403,6 +403,25 @@ app.post("/api/orderdetail", async (req, res) => {
     }
 });
 
+
+app.get("/api/orders/details", (req, res) => {
+    const sql = `
+        SELECT orders.created_at, orderdetail.goods_name, SUM(orderdetail.goods_weight) as total_weight
+        FROM orderdetail
+        JOIN orders ON orderdetail.order_id = orders.id
+        GROUP BY orders.created_at, orderdetail.goods_name
+        ORDER BY orders.created_at ASC;
+    `;
+
+    dbcon.query(sql, (err, results) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+        } else {
+            res.json(results);
+        }
+    });
+});
+
 // API เพิ่มรายละเอียดคำสั่งซื้อ (/orderdetail/add)
 app.post('/orderdetail/add', async (req, res) => {
     const { order_id, product_name, product_weight, idProduct } = req.body; // รับ idProduct จาก request body
