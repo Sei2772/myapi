@@ -1,9 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2')
+const bcrypt = require('bcryptjs'); // ✅ เปิดใช้งาน bcrypt
 require('dotenv').config();
 
 var app = express();
+// ✅ เปิดใช้งานการอ่าน JSON และ x-www-form-urlencoded body
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const connection = mysql.createConnection(process.env.DATABASE_URL)
 
