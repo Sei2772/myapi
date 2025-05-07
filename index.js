@@ -439,12 +439,13 @@ app.post('/orderdetail/add', async (req, res) => {
     }
 });
 
-// API สร้างคำสั่งซื้อใหม่ (/neworder)
 app.post('/neworder', function (req, res) {
-    let user_id = req.body.user_id || 0; // ถ้าไม่มี ให้ใช้ null แทน
+    console.log("Headers:", req.headers);  // ตรวจ Content-Type
+    console.log("Body:", req.body);        // ตรวจ body ที่รับมา
+
+    let user_id = req.body.user_id || null;
     let newOrder = { created_at: new Date() };
 
-    // เพิ่ม user_id ถ้ามีค่า
     if (user_id !== null) {
         newOrder.user_id = user_id;
     }
