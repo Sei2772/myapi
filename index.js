@@ -2,6 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2')
 const bcrypt = require('bcryptjs'); // ✅ เปิดใช้งาน bcrypt
+const connection = mysql.createConnection(process.env.DATABASE_URL);
+
+connection.connect((err) => {
+    if (err) {
+        console.error('Database connection failed:', err.stack);
+        return;
+    }
+    console.log('Connected to database.');
+});
 require('dotenv').config();
 
 var app = express();
@@ -541,26 +550,23 @@ app.get("/api/orders/details", (req, res) => {
 
 
 
-app.get('/orderdetails', function (req, res) {
-    const sql = `
-        SELECT orderdetail.order_id,
-               orderdetail.product_name,
-               orderdetail.product_weight,
-               orderdetail.product_price,
-               orders.created_at
-        FROM orderdetail
-        JOIN orders ON orderdetail.order_id = orders.id
-        WHERE isDelete = 0
-        GROUP BY orderdetail.order_id, orderdetail.product_name, orderdetail.product_weight,orderdetail.product_price, orders.created_at
-        ORDER BY orders.created_at DESC;
-    `;
-
-    dbcon.query(sql, function (error, results) {
-        if (error) {
-            return res.status(500).send({ error: true, message: 'Database error', details: error });
-        }
-        return res.send(results);
-    });
+app.get('/orderdetails', async (req, res) => {
+    try {
+        const sql = `
+            SELECT orderdetail.order_id, orderdetail.product_name, orderdetail.product_weight, orderdetail.product_price, orders.created_at
+            FROM orderdetail
+            JOIN orders ON orderdetail.order_id = orders.id
+            WHERE isDeleted = 0
+            GROUP BY orderdetail.order_id, orderdetail.product_name, orderdetail.product_weight, orderdetail.product_price, orders.created_at
+            ORDER BY orders.created_at DESC;
+        `;
+        connection.query(sql, (error, results) => {
+            if (error) throw error;
+            res.send(results);
+        });
+    } catch (err) {
+        res.status(500).json({ error: true, message: 'Internal Server Error', details: err.message });
+    }
 });
 
 app.get('/orderDetailJoin/:code', function(req,res){
