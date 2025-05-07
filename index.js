@@ -441,15 +441,15 @@ app.post('/orderdetail/add', async (req, res) => {
 
 // API สร้างคำสั่งซื้อใหม่ (/neworder)
 app.post('/neworder', function (req, res) {
-    let user_id = req.body.user_id; // รับ user_id จาก request body
+    let user_id = req.body.user_id || 0; // ถ้าไม่มี ให้ใช้ null แทน
+    let newOrder = { created_at: new Date() };
 
-    if (!user_id) {
-        return res.status(400).send({ error: true, message: 'Please provide user_id' });
+    // เพิ่ม user_id ถ้ามีค่า
+    if (user_id !== null) {
+        newOrder.user_id = user_id;
     }
 
-    let newOrder = { created_at: new Date(), user_id: user_id };
-
-    connection.query('INSERT INTO orders SET ?', newOrder, function (error, results) {
+    dbcon.query('INSERT INTO orders SET ?', newOrder, function (error, results) {
         if (error) {
             return res.status(500).send({ error: true, message: 'Database error', details: error });
         }
