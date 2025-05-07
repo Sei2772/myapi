@@ -541,10 +541,10 @@ app.get('/products/filter', function (req, res) {
 
 app.get("/api/orders/details", (req, res) => {
     const sql = `
-        SELECT orders.created_at, orderdetail.goods_name, SUM(orderdetail.goods_weight) as total_weight
+        SELECT orders.created_at, orderdetail.product_name, SUM(orderdetail.product_weight) as total_weight
         FROM orderdetail
         JOIN orders ON orderdetail.order_id = orders.id
-        GROUP BY orders.created_at, orderdetail.goods_name
+        GROUP BY orders.created_at, orderdetail.product_name
         ORDER BY orders.created_at ASC;
     `;
 
