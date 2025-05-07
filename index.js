@@ -443,7 +443,8 @@ app.post('/neworder', function (req, res) {
     console.log("Headers:", req.headers);  // ตรวจ Content-Type
     console.log("Body:", req.body);        // ตรวจ body ที่รับมา
 
-    let user_id = req.body.user_id || null;
+    let user_id = req.body?.user_id || null;
+
     let newOrder = { created_at: new Date() };
 
     if (user_id !== null) {
