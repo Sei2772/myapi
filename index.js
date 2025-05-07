@@ -4,9 +4,8 @@ const mysql = require('mysql2')
 const bcrypt = require('bcryptjs'); // ✅ เปิดใช้งาน bcrypt
 require('dotenv').config();
 
-var express = require('express');
+
 var app = express();
-var bodyParser = require('body-parser');
 
 // ✅ เปิดใช้งานการอ่าน JSON และ x-www-form-urlencoded body
 app.use(express.json());
