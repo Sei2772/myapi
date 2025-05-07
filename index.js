@@ -552,14 +552,18 @@ app.get('/orderdetails', function (req, res) {
                orders.created_at
         FROM orderdetail
         JOIN orders ON orderdetail.order_id = orders.id
-        WHERE isDelete = 0
-        GROUP BY orderdetail.order_id, orderdetail.product_name, orderdetail.product_weight,orderdetail.product_price, orders.created_at
+        WHERE orders.isDelete = 0
         ORDER BY orders.created_at DESC;
     `;
 
     dbcon.query(sql, function (error, results) {
         if (error) {
-            return res.status(500).send({ error: true, message: 'Database error', details: error });
+            console.error('Query error:', error); // เพิ่ม log
+            return res.status(500).send({
+                error: true,
+                message: 'Database error',
+                details: error.message // ส่งข้อความ error กลับไป
+            });
         }
         return res.send(results);
     });
