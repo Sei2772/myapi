@@ -410,7 +410,7 @@ app.post("/api/orderdetail", async (req, res) => {
     try {
         const { order_id, product_name, product_weight, idProduct } = req.body; // รับ idProduct จาก request body
 
-        await connection.query(
+        await dbcon.query(
             "INSERT INTO orderdetail (order_id, product_name, product_weight, idProduct) VALUES (?, ?, ?, ?)",
             [order_id, product_name, product_weight, idProduct]
         );
