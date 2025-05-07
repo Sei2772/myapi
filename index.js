@@ -5,6 +5,22 @@ const bcrypt = require('bcryptjs'); // ✅ เปิดใช้งาน bcrypt
 require('dotenv').config();
 
 
+// ถ้าใช้ dotenv
+require('dotenv').config();
+
+const dbcon = mysql.createConnection(process.env.DATABASE_URL);
+
+dbcon.connect((err) => {
+    if (err) {
+        console.error('❌ Cannot connect to database:', err);
+        process.exit(1); // หยุด process ถ้าเชื่อมไม่ได้
+    } else {
+        console.log('✅ Connected to MySQL database');
+    }
+});
+
+
+
 var app = express();
 
 // ✅ เปิดใช้งานการอ่าน JSON และ x-www-form-urlencoded body
