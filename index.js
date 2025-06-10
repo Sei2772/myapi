@@ -741,7 +741,7 @@ app.get('/dashboard', function (req, res) {
                     const { product_name, product_weight } = detail;
                     dbcon.query(
                         "UPDATE product SET quantity = quantity + ? WHERE product_name = ?",
-                        [product_weight, idProduct],
+                        [product_weight, product_name],
                         (err, result) => {
                             if (err) return reject(err);
                             resolve();
