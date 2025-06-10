@@ -28,23 +28,14 @@ app.use(express.urlencoded({ extended: true }));
 
 const connection = mysql.createConnection(process.env.DATABASE_URL)
 
-// var bodyParser = require('body-parser');
-// const bcrypt = require('bcryptjs');
 
-// app.use(bodyParser.json());
-// app.use(bodyParser.urlencoded({ extended: true }));
 
 
 app.get('/', function (req, res) {
     res.json({msg: 'it working!'})
 });
 
-// var db = mysql.createConnection({
-//     host: process.env.DB_HOST,
-//     user: process.env.DB_USER,
-//     password: process.env.DB_PASSWORD,
-//     database: process.env.DB_NAME,
-// });
+
 
 // dbcon.connect();
 
@@ -726,12 +717,6 @@ app.get('/dashboard', function (req, res) {
         return res.send(results[0]);
     });
 });
-
-
-
-
-//------------------------------------------------------
-
     app.put("/softDeleteOrderdetail/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -753,9 +738,9 @@ app.get('/dashboard', function (req, res) {
             // 2. อัปเดต quantity ของ product
             const updateTasks = orderDetails.map(detail => {
                 return new Promise((resolve, reject) => {
-                    const { idProduct, product_weight } = detail;
+                    const { product_name, product_weight } = detail;
                     dbcon.query(
-                        "UPDATE product SET quantity = quantity + ? WHERE idProduct = ?",
+                        "UPDATE product SET quantity = quantity + ? WHERE product_name = ?",
                         [product_weight, idProduct],
                         (err, result) => {
                             if (err) return reject(err);
