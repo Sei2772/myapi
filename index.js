@@ -14,8 +14,7 @@ dbcon.connect((err) => {
     if (err) {
         console.error('❌ Cannot connect to database:', err);
         process.exit(1); // หยุด process ถ้าเชื่อมไม่ได้
-    } else {
-        console.log('✅ Connected to MySQL database');
+    } else {         console.log('✅ Connected to MySQL database');
     }
 });
 
@@ -733,31 +732,56 @@ app.get('/dashboard', function (req, res) {
 
 //------------------------------------------------------
 
-app.put("/softDeleteOrderdetail/:id", async (req, res) => {
+    app.put("/softDeleteOrderdetail/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("กำลังลบสินค้า ID:", id); // Debug log
+        console.log("กำลังลบสินค้า ID:", id);
 
         if (!id || isNaN(id)) {
             return res.status(400).json({ error: "รหัสสินค้าที่ส่งมาไม่ถูกต้อง" });
         }
 
-        // ตรวจสอบว่าสินค้ามีอยู่จริง
-        dbcon.query("SELECT * FROM orderdetail WHERE order_id = ?", [id], (error, results) => {
+        // 1. ตรวจสอบ orderdetail ที่เกี่ยวข้อง
+        dbcon.query("SELECT * FROM orderdetail WHERE order_id = ? AND isDelete = 0", [id], (error, orderDetails) => {
             if (error) {
                 return res.status(500).json({ error: "Database error", details: error });
             }
-            if (results.length === 0) {
-                return res.status(404).json({ error: "ไม่พบสินค้า" });
+            if (orderDetails.length === 0) {
+                return res.status(404).json({ error: "ไม่พบรายการ orderdetail ที่ต้องการลบ" });
             }
 
-            // ทำ Soft Delete
-            dbcon.query("UPDATE orderdetail SET isDelete = 1 WHERE order_id = ?", [id], (error, result) => {
-                if (error) {
-                    return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะลบสินค้า" });
-                }
-                return res.status(200).json({ message: "ลบสินค้าสำเร็จ" });
+            // 2. อัปเดต quantity ของ product
+            const updateTasks = orderDetails.map(detail => {
+                return new Promise((resolve, reject) => {
+                    const { idProduct, product_weight } = detail;
+                    dbcon.query(
+                        "UPDATE product SET quantity = quantity + ? WHERE idProduct = ?",
+                        [product_weight, idProduct],
+                        (err, result) => {
+                            if (err) return reject(err);
+                            resolve();
+                        }
+                    );
+                });
             });
+
+            // 3. รอให้ update ทั้งหมดเสร็จ จากนั้นทำ soft delete
+            Promise.all(updateTasks)
+                .then(() => {
+                    dbcon.query(
+                        "UPDATE orderdetail SET isDelete = 1 WHERE order_id = ?",
+                        [id],
+                        (err, result) => {
+                            if (err) {
+                                return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะลบสินค้า" });
+                            }
+                            return res.status(200).json({ message: "ลบสินค้าสำเร็จและคืน stock เรียบร้อย" });
+                        }
+                    );
+                })
+                .catch(err => {
+                    return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะคืน stock", details: err });
+                });
         });
 
     } catch (error) {
