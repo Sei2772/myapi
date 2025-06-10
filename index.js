@@ -282,77 +282,101 @@ app.get("/products/:id", (req, res) => {
 app.post('/add', function (req, res) {
     let orderData = req.body;
 
-
-    // ตรวจสอบว่ามีข้อมูลที่จำเป็น
-    if (!orderData.product_name || !orderData.product_weight) {
-        return res.status(400).send({ error: true, message: 'Please provide order details' });
+    if (!orderData.product_name || !orderData.product_weight || !orderData.product_price) {
+        return res.status(400).send({ error: true, message: 'Please provide product_name, product_weight, and product_price' });
     }
 
-
- // 1. ดึง idProduct จาก product_name
-dbcon.query('SELECT idProduct FROM product WHERE ProductName = ?', [orderData.product_name], function (error, resultProduct) {
-    if (error || resultProduct.length === 0) {
-        console.error('Error finding idProduct:', error);
-        return res.status(500).send({ error: true, message: 'ไม่พบสินค้าในระบบ หรือเกิดข้อผิดพลาด', details: error });
-    }
-
-    const idProduct = resultProduct[0].idProduct;
-
-    // 2. เตรียมข้อมูล orderdetail
-    let newOrderDetail = {
-        order_id: latestOrderId,
-        idProduct: idProduct,
-        product_name: orderData.product_name,
-        product_weight: orderData.product_weight,
-        product_price: orderData.product_price * orderData.product_weight
-    };
-
-    // 3. ตรวจสอบว่ามีสินค้านี้ใน orderdetail หรือยัง
-    dbcon.query('SELECT * FROM orderdetail WHERE order_id = ? AND idProduct = ?', [latestOrderId, idProduct], function (error, results) {
-        if (error) {
-            console.error('Error checking orderdetail:', error);
-            return res.status(500).send({ error: true, message: 'Database error when checking order detail', details: error });
+    // Step 1: ดึง idProduct จาก product_name
+    dbcon.query('SELECT idProduct FROM product WHERE ProductName = ?', [orderData.product_name], function (error, resultProduct) {
+        if (error || resultProduct.length === 0) {
+            console.error('Error finding idProduct:', error);
+            return res.status(500).send({ error: true, message: 'ไม่พบสินค้าในระบบ หรือเกิดข้อผิดพลาด', details: error });
         }
 
-        if (results.length > 0) {
-            // มีแล้ว -> update
-            dbcon.query('UPDATE orderdetail SET product_weight = ? WHERE order_id = ? AND idProduct = ?',
-                [orderData.product_weight, latestOrderId, idProduct], function (error, results) {
+        const idProduct = resultProduct[0].idProduct;
+
+        // Step 2: ดึง Order ID ล่าสุด
+        dbcon.query('SELECT id FROM orders ORDER BY id DESC LIMIT 1', function (error, results) {
+            if (error) {
+                console.error('Database error when fetching order id:', error);
+                return res.status(500).send({ error: true, message: 'Database error', details: error });
+            }
+
+            const insertOrContinue = (latestOrderId) => {
+                // Step 3: เตรียมข้อมูล orderdetail
+                let newOrderDetail = {
+                    order_id: latestOrderId,
+                    idProduct: idProduct,
+                    product_name: orderData.product_name,
+                    product_weight: orderData.product_weight,
+                    product_price: orderData.product_price * orderData.product_weight
+                };
+
+                // Step 4: ตรวจสอบว่าสินค้านี้มีอยู่แล้วใน orderdetail หรือไม่
+                dbcon.query('SELECT * FROM orderdetail WHERE order_id = ? AND idProduct = ?', [latestOrderId, idProduct], function (error, results) {
                     if (error) {
-                        console.error('Error updating orderdetail:', error);
-                        return res.status(500).send({ error: true, message: 'Error updating order detail', details: error });
+                        console.error('Error checking orderdetail:', error);
+                        return res.status(500).send({ error: true, message: 'Database error when checking order detail', details: error });
                     }
 
-                    // อัปเดต stock
-                    dbcon.query('UPDATE product SET quantity = quantity - ? WHERE idProduct = ?',
-                        [orderData.product_weight, idProduct], function (error, results) {
-                            if (error) {
-                                console.error('Error updating product quantity:', error);
-                                return res.status(500).send({ error: true, message: 'Error updating stock', details: error });
-                            }
-                            return res.send({ success: true, message: 'อัปเดตรายการสำเร็จและตัด stock แล้ว' });
-                        });
-                });
-        } else {
-            // ยังไม่มี -> insert ใหม่
-            dbcon.query('INSERT INTO orderdetail SET ?', newOrderDetail, function (error, results) {
-                if (error) {
-                    console.error('Error inserting orderdetail:', error);
-                    return res.status(500).send({ error: true, message: 'Error inserting order detail', details: error });
-                }
+                    if (results.length > 0) {
+                        // มีสินค้าอยู่แล้ว -> อัปเดตน้ำหนัก
+                        dbcon.query('UPDATE orderdetail SET product_weight = ? WHERE order_id = ? AND idProduct = ?',
+                            [orderData.product_weight, latestOrderId, idProduct], function (error) {
+                                if (error) {
+                                    console.error('Error updating orderdetail:', error);
+                                    return res.status(500).send({ error: true, message: 'Error updating order detail', details: error });
+                                }
 
-                dbcon.query('UPDATE product SET quantity = quantity - ? WHERE idProduct = ?',
-                    [orderData.product_weight, idProduct], function (error, results) {
-                        if (error) {
-                            console.error('Error updating product quantity:', error);
-                            return res.status(500).send({ error: true, message: 'Error updating stock', details: error });
-                        }
-                        return res.send({ success: true, message: 'เพิ่มสินค้าและตัด stock สำเร็จ' });
-                    });
-            });
-        }
+                                // อัปเดต stock
+                                dbcon.query('UPDATE product SET quantity = quantity - ? WHERE idProduct = ?',
+                                    [orderData.product_weight, idProduct], function (error) {
+                                        if (error) {
+                                            console.error('Error updating product quantity:', error);
+                                            return res.status(500).send({ error: true, message: 'Error updating stock', details: error });
+                                        }
+
+                                        return res.send({ success: true, message: 'อัปเดตรายการสำเร็จและตัด stock แล้ว' });
+                                    });
+                            });
+                    } else {
+                        // ยังไม่มีสินค้า -> เพิ่มใหม่
+                        dbcon.query('INSERT INTO orderdetail SET ?', newOrderDetail, function (error) {
+                            if (error) {
+                                console.error('Error inserting orderdetail:', error);
+                                return res.status(500).send({ error: true, message: 'Error inserting order detail', details: error });
+                            }
+
+                            dbcon.query('UPDATE product SET quantity = quantity - ? WHERE idProduct = ?',
+                                [orderData.product_weight, idProduct], function (error) {
+                                    if (error) {
+                                        console.error('Error updating product quantity:', error);
+                                        return res.status(500).send({ error: true, message: 'Error updating stock', details: error });
+                                    }
+
+                                    return res.send({ success: true, message: 'เพิ่มสินค้าและตัด stock สำเร็จ' });
+                                });
+                        });
+                    }
+                });
+            };
+
+            // ถ้ายังไม่มี order ให้สร้างใหม่
+            if (results.length === 0) {
+                dbcon.query('INSERT INTO orders (created_at) VALUES (NOW())', function (error, result) {
+                    if (error) {
+                        console.error('Error creating order:', error);
+                        return res.status(500).send({ error: true, message: 'Error creating order', details: error });
+                    }
+                    insertOrContinue(result.insertId);
+                });
+            } else {
+                insertOrContinue(results[0].id);
+            }
+        });
     });
 });
+
 
 
 
