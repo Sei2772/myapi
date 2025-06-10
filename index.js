@@ -597,7 +597,6 @@ app.get('/orderdetails', function (req, res) {
 app.get('/orderDetailJoin/:code', function(req,res){
     let code = req.params.code;
 
-
     let queryFormat = `
         SELECT
             orderdetail.id AS od_ID,
@@ -614,35 +613,34 @@ app.get('/orderDetailJoin/:code', function(req,res){
             LEFT JOIN orders ON orderdetail.order_id = orders.id
             LEFT JOIN product ON orderdetail.idProduct = product.idProduct
             LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
-        WHERE product.isDeleted = 0 AND orderdetail.product_weight IS NOT NULL AND orderdetail.product_price IS NOT NULL  `
-
+        WHERE product.isDeleted = 0
+            AND orderdetail.isDelete = 0
+            AND orderdetail.product_weight IS NOT NULL
+            AND orderdetail.product_price IS NOT NULL
+    `;
 
     if (code == 0) {
-        queryFormat += `AND DATE(orders.created_at) = CURDATE()`
-    }
-    else if (code == 1) {
-        queryFormat += `AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`
-    }
-    else if (code == 2) {
-        queryFormat += `AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)`
+        queryFormat += ` AND DATE(orders.created_at) = CURDATE()`;
+    } else if (code == 1) {
+        queryFormat += ` AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`;
+    } else if (code == 2) {
+        queryFormat += ` AND DATE(orders.created_at) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)`;
     }
 
+    queryFormat += ` ORDER BY orders.created_at DESC;`;
 
-    queryFormat += ` ORDER BY orders.created_at DESC;`
-
-
-    dbcon.query(queryFormat, function(error,results, fields){
-            if(error) throw error;
-                return res.send(results);
+    dbcon.query(queryFormat, function(error,results){
+        if (error) throw error;
+        return res.send(results);
     });
 });
+
 
 
 app.get('/getDayProductJoinType/:pd/:date', function(req,res){
     let pd = req.params.pd;
     let date = req.params.date;
 
-
     let queryFormat = `
         SELECT
             orderdetail.id AS od_ID,
@@ -659,24 +657,25 @@ app.get('/getDayProductJoinType/:pd/:date', function(req,res){
             LEFT JOIN orders ON orderdetail.order_id = orders.id
             LEFT JOIN product ON orderdetail.idProduct = product.idProduct
             LEFT JOIN producttype ON product.ProductType_idProductType = producttype.idProductType
-        WHERE product.isDeleted = 0 AND orderdetail.product_weight IS NOT NULL AND orderdetail.product_price IS NOT NULL  
-    `
+        WHERE product.isDeleted = 0
+            AND orderdetail.isDelete = 0
+            AND orderdetail.product_weight IS NOT NULL
+            AND orderdetail.product_price IS NOT NULL
+    `;
+
     if (date) {
         queryFormat += ` AND DATE(orders.created_at) = CAST('${date}' AS DATE)`;
     }
-
 
     if (pd != 0) {
         queryFormat += ` AND product.idProduct = ${pd}`;
     }
 
+    queryFormat += ` ORDER BY orders.created_at DESC;`;
 
-    queryFormat += ` ORDER BY orders.created_at DESC;`
-
-
-    dbcon.query(queryFormat, function(error,results, fields){
-            if(error) throw error;
-                return res.send(results);
+    dbcon.query(queryFormat, function(error,results){
+        if (error) throw error;
+        return res.send(results);
     });
 });
 
@@ -711,15 +710,19 @@ app.get('/getProductJoinType', function(req,res){
 app.get('/dashboard', function (req, res) {
     let query = `
         SELECT
-            (SELECT COUNT(*) FROM orderdetail) AS total_orders,
-            (SELECT COUNT(*) FROM products) AS total_products,
-            (SELECT SUM(goods_weight) FROM orderdetail) AS total_sales
+            (SELECT COUNT(*) FROM orderdetail WHERE isDelete = 0) AS total_orders,
+            (SELECT COUNT(*) FROM product WHERE isDeleted = 0) AS total_products,
+            (
+                SELECT SUM(COALESCE(CAST(product_weight AS FLOAT), 0) * COALESCE(CAST(product_price AS FLOAT), 0))
+                FROM orderdetail WHERE isDelete = 0
+            ) AS total_sales
     `;
     dbcon.query(query, function (error, results) {
         if (error) return res.status(500).send({ error: true, message: 'Database error', details: error });
         return res.send(results[0]);
     });
 });
+
 app.put("/softDeleteOrderdetail/:id", (req, res) => {
     const { id } = req.params;
     console.log("กำลังลบสินค้าใน order ID:", id);
