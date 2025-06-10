@@ -728,49 +728,49 @@ app.put("/softDeleteOrderdetail/:id", (req, res) => {
         return res.status(400).json({ error: "รหัสออร์เดอร์ไม่ถูกต้อง" });
     }
 
-    // 1. ดึง orderdetail ที่ยังไม่ถูกลบ
+    // 1. ดึงข้อมูล orderdetail ที่ยังไม่ถูกลบ
     const selectQuery = `
-        SELECT product.product_name, orderdetail.product_weight 
-        FROM orderdetail 
-        JOIN product ON product.idProduct = orderdetail.idProduct 
-        WHERE orderdetail.order_id = ? AND orderdetail.isDelete = 0
+        SELECT p.idProduct, p.ProductName, od.product_weight
+        FROM orderdetail od
+        JOIN product p ON p.idProduct = od.idProduct
+        WHERE od.order_id = ? AND od.isDelete = 0
     `;
+
     dbcon.query(selectQuery, [id], (error, orderDetails) => {
         if (error) {
             return res.status(500).json({ error: "เกิดข้อผิดพลาดในการดึงข้อมูล orderdetail", details: error });
         }
 
         if (orderDetails.length === 0) {
-            return res.status(404).json({ error: "ไม่พบรายการ orderdetail ที่ต้องการลบ" });
+            return res.status(404).json({ error: "ไม่พบรายการ orderdetail ที่ยังไม่ถูกลบใน order นี้" });
         }
 
-        // 2. คืน stock โดยใช้ product_name
+        // 2. คืน stock โดยใช้ idProduct (ปลอดภัยกว่าชื่อ)
         const updateTasks = orderDetails.map(detail => {
-            const { product_name, product_weight } = detail;
             return new Promise((resolve, reject) => {
                 const updateQuery = `
                     UPDATE product 
                     SET quantity = quantity + ? 
-                    WHERE product_name = ?
+                    WHERE idProduct = ?
                 `;
-                dbcon.query(updateQuery, [product_weight, product_name], (err, result) => {
+                dbcon.query(updateQuery, [detail.product_weight, detail.idProduct], (err) => {
                     if (err) return reject(err);
                     resolve();
                 });
             });
         });
 
-        // 3. Soft delete รายการ
+        // 3. เมื่อคืน stock เสร็จ -> soft delete
         Promise.all(updateTasks)
             .then(() => {
                 const deleteQuery = `
                     UPDATE orderdetail 
                     SET isDelete = 1 
-                    WHERE order_id = ?
+                    WHERE order_id = ? AND isDelete = 0
                 `;
-                dbcon.query(deleteQuery, [id], (err, result) => {
+                dbcon.query(deleteQuery, [id], (err) => {
                     if (err) {
-                        return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะลบรายการ orderdetail" });
+                        return res.status(500).json({ error: "เกิดข้อผิดพลาดขณะลบรายการ orderdetail", details: err });
                     }
                     return res.status(200).json({ message: "ลบ orderdetail สำเร็จและคืน stock แล้ว" });
                 });
