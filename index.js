@@ -360,6 +360,37 @@ app.get('/orderdetails', async (req, res) => {
     });
   }
 });
+app.put('/orderdetail/:id', async (req, res) => {
+  const id = req.params.id;
+  const { product_weight, product_price } = req.body;
+
+  if (!id || product_weight == null || product_price == null) {
+    return res.status(400).json({
+      error: true,
+      message: 'กรุณาระบุ ID, น้ำหนัก และราคา',
+    });
+  }
+
+  try {
+    const result = await query(
+      'UPDATE orderdetail SET product_weight = ?, product_price = ? WHERE id = ? AND isDelete = 0',
+      [product_weight, product_price, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: true, message: 'ไม่พบรายการที่ต้องการอัปเดต' });
+    }
+
+    res.json({ success: true, message: 'อัปเดตรายการสำเร็จ' });
+  } catch (err) {
+    res.status(500).json({
+      error: true,
+      message: 'เกิดข้อผิดพลาด',
+      details: err.message,
+    });
+  }
+});
+
 
 // ✅ /dashboard & /topproducts endpoints
 
