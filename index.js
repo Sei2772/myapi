@@ -360,36 +360,45 @@ app.get('/orderdetails', async (req, res) => {
     });
   }
 });
-app.put('/orderdetail/:id', async (req, res) => {
-  const id = req.params.id;
+app.put('/orderdetail/update/:idProduct', async (req, res) => {
+  const idProduct = req.params.idProduct;
   const { product_weight, product_price } = req.body;
 
-  if (!id || product_weight == null || product_price == null) {
-    return res.status(400).json({
-      error: true,
-      message: 'กรุณาระบุ ID, น้ำหนัก และราคา',
-    });
+  if (product_weight === undefined && product_price === undefined) {
+    return res.status(400).json({ success: false, message: "กรุณาส่งข้อมูลน้ำหนักหรือราคาที่ต้องการอัพเดต" });
   }
 
   try {
-    const result = await query(
-      'UPDATE orderdetail SET product_weight = ?, product_price = ? WHERE id = ? AND isDelete = 0',
-      [product_weight, product_price, id]
-    );
+    const fields = [];
+    const values = [];
+
+    if (product_weight !== undefined) {
+      fields.push("product_weight = ?");
+      values.push(product_weight);
+    }
+    if (product_price !== undefined) {
+      fields.push("product_price = ?");
+      values.push(product_price);
+    }
+    values.push(idProduct);
+
+    const sql = `
+      UPDATE orderdetail 
+      SET ${fields.join(", ")}
+      WHERE idProduct = ? AND isDelete = 0
+    `;
+
+    const [result] = await db.query(sql, values);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: true, message: 'ไม่พบรายการที่ต้องการอัปเดต' });
+      return res.status(404).json({ success: false, message: "ไม่พบข้อมูลที่ต้องการแก้ไข" });
     }
-
-    res.json({ success: true, message: 'อัปเดตรายการสำเร็จ' });
+    res.json({ success: true, message: "แก้ไขข้อมูลสำเร็จ" });
   } catch (err) {
-    res.status(500).json({
-      error: true,
-      message: 'เกิดข้อผิดพลาด',
-      details: err.message,
-    });
+    res.status(500).json({ success: false, message: "เกิดข้อผิดพลาด", error: err.message });
   }
 });
+
 
 
 // ✅ /dashboard & /topproducts endpoints
