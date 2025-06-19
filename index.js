@@ -373,31 +373,31 @@ app.put('/orderdetail/update/:idProduct', async (req, res) => {
     const values = [];
 
     if (product_weight !== undefined) {
-      fields.push("product_weight = ?");
+      fields.push('product_weight = ?');
       values.push(product_weight);
     }
     if (product_price !== undefined) {
-      fields.push("product_price = ?");
+      fields.push('product_price = ?');
       values.push(product_price);
     }
+
     values.push(idProduct);
 
-    const sql = `
-      UPDATE orderdetail 
-      SET ${fields.join(", ")}
-      WHERE idProduct = ? AND isDelete = 0
-    `;
+    const sql = `UPDATE orderdetail SET ${fields.join(', ')} WHERE idProduct = ? AND isDelete = 0`;
 
-    const [result] = await db.query(sql, values);
+    const result = await query(sql, values);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: "ไม่พบข้อมูลที่ต้องการแก้ไข" });
+      return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลที่ต้องการแก้ไข' });
     }
-    res.json({ success: true, message: "แก้ไขข้อมูลสำเร็จ" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "เกิดข้อผิดพลาด", error: err.message });
+
+    res.json({ success: true, message: 'แก้ไขข้อมูลสำเร็จ' });
+  } catch (error) {
+    console.error('Error updating orderdetail:', error);
+    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด', error: error.message });
   }
 });
+
 
 
 
