@@ -543,8 +543,9 @@ app.get('/orderDetailJoin/:code', async (req, res) => {
   }
 });
 
-$&
+app.listen(process.env.PORT || 3000, () => {
   console.log('Node app is running on port', process.env.PORT || 3000);
 });
 
 module.exports = app;
+
