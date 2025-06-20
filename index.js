@@ -324,7 +324,10 @@ app.post('/orderdetail/add', async (req, res) => {
   const { order_id, product_name, product_weight, idProduct } = req.body;
 
   if (!order_id || !product_name || !product_weight || !idProduct) {
-    return res.status(400).json({ message: 'ข้อมูลไม่ครบ' });
+    return res.status(400).json({
+      success: false,
+      message: 'ข้อมูลไม่ครบ'
+    });
   }
 
   try {
@@ -332,11 +335,19 @@ app.post('/orderdetail/add', async (req, res) => {
       'INSERT INTO orderdetail (order_id, product_name, product_weight, idProduct) VALUES (?, ?, ?, ?)',
       [order_id, product_name, product_weight, idProduct]
     );
-    res.status(201).json({ message: 'เพิ่ม orderdetail สำเร็จ!' });
+    res.status(201).json({
+      success: true,
+      message: 'เพิ่ม orderdetail สำเร็จ!'
+    });
   } catch (err) {
-    res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: err.message });
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาด',
+      error: err.message
+    });
   }
 });
+
 
 app.get('/orderdetails', async (req, res) => {
   const sql = `
