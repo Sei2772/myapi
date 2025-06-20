@@ -272,6 +272,8 @@ app.get('/products/:id', async (req, res) => {
 // ✅ /orders & /orderdetail endpoints
 
 app.post('/neworder', async (req, res) => {
+  if (!req.body) return res.status(400).json({ error: true, message: 'Missing body data' });
+
   const { user_id } = req.body;
   const newOrder = { created_at: new Date() };
   if (user_id) newOrder.user_id = user_id;
@@ -283,6 +285,7 @@ app.post('/neworder', async (req, res) => {
     res.status(500).send({ error: true, message: 'Database error', details: err.message });
   }
 });
+
 
 app.get('/orders', async (req, res) => {
   try {
