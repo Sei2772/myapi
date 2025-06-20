@@ -272,19 +272,18 @@ app.get('/products/:id', async (req, res) => {
 // ✅ /orders & /orderdetail endpoints
 
 app.post('/neworder', async (req, res) => {
-  if (!req.body) return res.status(400).json({ error: true, message: 'Missing body data' });
-
-  const { user_id } = req.body;
+  const { user_id } = req.body || {};
   const newOrder = { created_at: new Date() };
   if (user_id) newOrder.user_id = user_id;
 
   try {
     const result = await query('INSERT INTO orders SET ?', [newOrder]);
     res.send({ success: true, message: 'New order created successfully.', order_id: result.insertId });
-  } catch (err) {
-    res.status(500).send({ error: true, message: 'Database error', details: err.message });
+  } catch (error) {
+    res.status(500).send({ error: true, message: 'Database error', details: error.message });
   }
 });
+
 
 
 app.get('/orders', async (req, res) => {
